@@ -1,0 +1,23 @@
+{
+  "name": "devhack_hackathon",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "node src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paranoidGhost/devhack_hackathon.git"
+  },
+  "author": "paranoidGhost",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/paranoidGhost/devhack_hackathon/issues"
+  },
+  "homepage": "https://github.com/paranoidGhost/devhack_hackathon#readme",
+  "dependencies": {
+    "colors": "^1.4.0",
+    "node-telegram-bot-api": "^0.61.0"
+  }
+}
