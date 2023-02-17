@@ -1,5 +1,6 @@
 const http = require("http")
 const fs = require("fs")
+const browshot = require('browshot');
 const tgAPI = require('node-telegram-bot-api');
 const path = require("path")
 const port = 3000
@@ -49,9 +50,22 @@ function getContentType(url){
     }
 }
 
+const respondToAPI = (request, response) => {
+    const args = request.split("/")
+    const request_type = args[2]
+    switch (request_type){
+        case "getWebsiteInfo": {
+            const URL = args[3]
+        }
+    }
+    
+}
+
 const server = http.createServer(function(request,response){
     if (request.url === "/"){
         sendRes("index.html","text/html",response)
+    } else if (request.url.startsWith("/api")) {
+        respondToAPI(request.url,response)
     } else {
         sendRes(request.url, getContentType(request.url), response)
     }

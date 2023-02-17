@@ -1,0 +1,6 @@
+html ,body { background-color: rgb(14, 14, 14); margin: 0; margin: 0; overflow: hidden;}
+
+h1, h2, h3, h4, h5, h6, p, span, a {
+    color: white;
+    font-family: 'Courier New', Courier, monospace;
+}
