@@ -17,7 +17,11 @@
   },
   "homepage": "https://github.com/paranoidGhost/devhack_hackathon#readme",
   "dependencies": {
+    "api": "^5.0.7",
     "colors": "^1.4.0",
-    "node-telegram-bot-api": "^0.61.0"
+    "got": "^12.5.3",
+    "js-base64": "^3.7.5",
+    "node-telegram-bot-api": "^0.61.0",
+    "superagent": "^6.1.0"
   }
 }
