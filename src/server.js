@@ -1,6 +1,5 @@
 const http = require("http")
 const fs = require("fs")
-const browshot = require('browshot');
 const tgAPI = require('node-telegram-bot-api');
 const path = require("path")
 const port = 3000
