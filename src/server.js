@@ -106,3 +106,10 @@ bot.onText("/start", (msg, match) => {
 bot.on("callback_query", msg => {
     console.log(msg.data)
 })
+
+let mask = document.querySelector(".mask");
+
+window.addEventListener('load', () =>{
+	mask.classList.add('hide');
+	setTimeout(() =>{mask.remove();}, 600);
+});
