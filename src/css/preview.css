@@ -70,3 +70,31 @@
 .hide {
   opacity: 0;
 }
+
+#result {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: rgb(14, 14, 14);
+  width: 105%;
+  height: 105%;
+}
+
+#result > h1 {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 4em;
+}
+
+#result > h1 > p {
+  font-size: 0.4em;
+}
+
+#result > h4 {
+  width: 60vw;
+}

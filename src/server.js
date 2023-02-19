@@ -5,14 +5,18 @@ const VTapi = require('api')('@virustotal/v3.0#ejc31lduc892u');
 const path = require("path")
 const port = process.env.PORT || 443
 var secrets = JSON.parse(fs.readFileSync(__dirname + '/secrets.json'))
+var dangerous_domains = fs.readFileSync(__dirname + '/dangerous-domains.txt', 'utf8')
 var gCONFIG = JSON.parse(fs.readFileSync(__dirname + '/config.json'))
 var colors = require('colors');
 
 const WhoisApi = require('whois-api-js');
 const { create } = require("domain");
+const { info } = require("console");
 
 const WhoisApiClient = new WhoisApi.Client(secrets.WhoisApi)
 const bot = new tgAPI(secrets.telegramBotToken, { polling: true });
+
+const selfURL = "https://link-checker.onrender.com"
 
 function sendRes(url, contentType, response) {
     const file = path.join(__dirname + "/", url)
@@ -54,71 +58,111 @@ function getContentType(url) {
     }
 }
 
+const checkURL = (url, response, chatId) => {
+    let WhoisData = null
+    WhoisApiClient.getRaw(url, WhoisApi.JSON_FORMAT)
+        .then(function (data) {
+            const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+            var suspoints = 0
+            const urlObject = new URL(url)
+            var DataToReturn = {}
+            var info = ""
+            const addField = (field, value) => {
+                DataToReturn[field] = value
+            }
+            WhoisData = JSON.parse(data).WhoisRecord
+            // Registrant info
+            const registrant = WhoisData["registrant"]
+            try {
+                const registrantFlagURL = "https://countryflagsapi.com/png/"+registrant.countryCode
+                addField("reg_flag", registrantFlagURL)
+            } catch (error) { }
+            try {
+                const registrantCountry = registrant.country
+                addField("Страна регистрации", registrantCountry)
+            } catch (error) { }
+            try {
+                const registrantOrg = registrant.organization
+                addField("Организация регистрации", registrantOrg)
+            } catch (error) { }
+            // Date created
+            try {
+                const createdDate = new Date(WhoisData.createdDate)
+                addField("Дата регистрации", createdDate)
+                suspoints += (createdDate.getFullYear() - 2015) / 10
+            } catch (error) { }
+            // Email
+            try {
+                const contactEmail = WhoisData["contactEmail"]
+                addField("Контактный адрес электронной почты", contactEmail)
+            } catch (error) { }
+            // Hosts
+            try {
+                const hosts = WhoisData.nameServers.hostNames
+                addField("hosts", createdDate)
+                suspoints = suspoints / hosts.length
+            } catch (error) { }
+            try {
+                let count = 0
+                const subdomains = urlObject.host.split(".")
+                for (let i = 2; i < 100; i++) {
+                    if (subdomains[i]) {
+                        count += 1
+                        suspoints += 1
+                    }
+                }
+                addField("Субдоменов", count)
+            } catch (error) { console.log(error) }
+            suspoints = clamp(suspoints, 0, 10)
+            const fieldKeys = Object.keys(DataToReturn)
+            fieldKeys.forEach((key) => {
+                const value = DataToReturn[key]
+                switch (key) {
+                    case "hosts":
+                        info += "Хосты:\n" + value.join("\n")
+                        break;
+                    case "Субдоменов":
+                        info += "Субдоменов: " + value + "\n"
+                        break;
+                    case "Страна регистрации":
+                        if (response) {
+                            info += "Страна регистрации: " + value +")\n"
+                        } else {
+                            info += "Страна регистрации: [" + value + "]("+DataToReturn["reg_flag"]+")\n"
+                        }
+                        break;
+                    case "Организация регистрации":
+                        info += "Организация регистрации: " + value + "\n"
+                        break;
+                    case "Дата регистрации":
+                        info += "Дата регистрации: " + value + "\n"
+                        break;
+                }
+            })
+            if (dangerous_domains.search("\n"+urlObject.hostname+"\n") !== -1) {
+                suspoints = 9.9
+                info = "Найдена в базе данных опасных ссылок"
+            }
+            addField("suspoints", suspoints)
+            addField("info",info)
+            if (response) {
+                response.writeHead(200, { 'Content-Type': "application/json" })
+                response.write(JSON.stringify(DataToReturn))
+                response.end()
+                return
+            }
+
+            bot.sendMessage(chatId, "Подозрительность ссылки: " + suspoints + "/10\n" + info, { parse_mode: 'markdown' })
+        })
+}
+
 const respondToAPI = (request, response) => {
     const args = request.split("/")
     const request_type = args[2]
     switch (request_type) {
         case "checkWebsite": {
             const url = request.replace("/api/checkWebsite/", "")
-            let WhoisData = null
-            WhoisApiClient.getRaw(url, WhoisApi.JSON_FORMAT)
-                .then(function (data) {
-                    const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
-                    var suspoints = 0
-                    const urlObject = new URL(url)
-                    var DataToReturn = {}
-                    const addField = (field, value) => {
-                        DataToReturn[field] = value
-                    }
-                    WhoisData = JSON.parse(data).WhoisRecord
-                    // Registrant info
-                    const registrant = WhoisData["registrant"]
-                    try {
-                        const registrantFlagURL = "https://countryflagsapi.com/png/" + registrant.countryCode
-                        addField("reg_flag", registrantFlagURL)
-                    } catch (error) { }
-                    try {
-                        const registrantCountry = registrant.country
-                        addField("Страна регистрации", registrantCountry)
-                    } catch (error) { }
-                    try {
-                        const registrantOrg = registrant.organization
-                        addField("Организация регистрации", registrantOrg)
-                    } catch (error) { }
-                    // Date created
-                    try {
-                        const createdDate = new Date(WhoisData.createdDate)
-                        addField("Дата регистрации", createdDate)
-                        suspoints += (createdDate.getFullYear() - 2015) / 10
-                    } catch (error) { }
-                    // Email
-                    try {
-                        const contactEmail = WhoisData["contactEmail"]
-                        addField("Контактный адрес электронной почты", contactEmail)
-                    } catch (error) { }
-                    // Hosts
-                    try {
-                        const hosts = WhoisData.nameServers.hostNames
-                        addField("hosts", createdDate)
-                        suspoints = suspoints / hosts.length
-                    } catch (error) { }
-                    try {
-                        let count = 0
-                        const subdomains = urlObject.host.split(".")
-                        for (let i = 2; i < 100; i++) {
-                            if (subdomains[i]) {
-                                count += 1
-                                suspoints += 1
-                            }
-                        }
-                        addField("Субдоменов", count)
-                    } catch (error) { console.log(error) }
-                    suspoints = clamp(suspoints, 0, 10)
-                    addField("Подозрительность", suspoints)
-                    response.writeHead(200, { 'Content-Type': "application/json" })
-                    response.write(JSON.stringify(DataToReturn))
-                    response.end()
-                })
+            checkURL(url, response)
         }
     }
 }
@@ -143,6 +187,16 @@ server.listen(port, function (error) {
 
 
 // BOT starts here:
+var botChatStatuses = {}
+
+const stringIsAValidUrl = (s) => {
+    try {
+        new URL(s);
+        return true;
+    } catch (err) {
+        return false;
+    }
+};
 
 bot.setMyCommands([
     {
@@ -167,22 +221,41 @@ bot.onText(/\/start/, (msg, match) => {
             ]
         })
     }
-    bot.sendMessage(chatId, 'Привет! Что бы ты хотел сделать?',actionOptions)
+    bot.sendMessage(chatId, 'Привет! Что бы ты хотел сделать?', actionOptions)
+})
+
+bot.on('message', (msg) => {
+    const chatId = msg.chat.id
+    const status = botChatStatuses[chatId]
+    if (msg.text == "/start") {
+        botChatStatuses[chatId] = null
+        return
+    }
+    if (status == "awaiting_link") {
+        const URLtoCheck = msg.text
+        if (stringIsAValidUrl(URLtoCheck) == true) {
+            botChatStatuses[chatId] = null
+            checkURL(URLtoCheck, null, chatId)
+        } else {
+            bot.sendMessage(chatId, "Неверный формат ссылки | Пример: https://example.com")
+        }
+    }
 })
 
 
 bot.on('callback_query', (msg) => {
     const data = msg.data
     const chatId = msg.message.chat.id
-    if (data.startsWith("action_")){
-        const action = data.replace("action_","")
+    if (data.startsWith("action_")) {
+        const action = data.replace("action_", "")
         switch (action) {
-            case "check_link":{
-                bot.sendMessage(chatId,"↓ Хорошо, введи ссылку которую хочешь проверить ↓")
+            case "check_link": {
+                bot.sendMessage(chatId, "↓ Хорошо, введи ссылку которую хочешь проверить ↓")
+                botChatStatuses[chatId] = "awaiting_link"
                 break
             };
-            case "check_qr":{
-                bot.sendMessage(chatId,"Намного удобнее сканировать QR коды на нашем <a href='/'>сайте</a>",{parse_mode: 'HTML'})
+            case "check_qr": {
+                bot.sendMessage(chatId, "Намного удобнее сканировать QR коды на нашем [сайте](" + selfURL + ")", { parse_mode: 'markdown' })
                 break
             };
         }

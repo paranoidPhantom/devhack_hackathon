@@ -16,9 +16,20 @@ const handleScan = (content) => {
     http.onreadystatechange=function(){
         if (this.readyState==4 && this.status==200){
             const navigator = window.navigator
-            navigator.vibrate(200)
             const response = JSON.parse(http.response)
-            console.log(response)
+            const suspoints = response.suspoints
+            const result = document.getElementById("result")
+            result.classList.remove("hide")
+            loader.classList.add("hide")
+            const resultTitle = document.getElementById("value")
+            const colorString = "color: hsl("+ (130 - suspoints * 13) +"deg, 100%, 50%)"
+            resultTitle.setAttribute("style",colorString)
+            resultTitle.innerHTML = suspoints+"<p>/10</p>"
+            const details =  document.getElementById("details")
+            details.innerHTML = response.info
+            try {
+                navigator.vibrate(200)
+            } catch (error) {}
         }
     }
 }
