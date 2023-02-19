@@ -1,16 +1,17 @@
 const http = require("http")
-const https = require('https');
 const fs = require("fs")
 const tgAPI = require('node-telegram-bot-api');
 const VTapi = require('api')('@virustotal/v3.0#ejc31lduc892u');
-const { Base64 } = require('js-base64');
-const superagent = require('superagent');
 const path = require("path")
 const port = 3000
 var secrets = JSON.parse(fs.readFileSync(__dirname + '/secrets.json'))
 var gCONFIG = JSON.parse(fs.readFileSync(__dirname + '/config.json'))
 var colors = require('colors');
 
+const WhoisApi = require('whois-api-js');
+const { create } = require("domain");
+
+const WhoisApiClient = new WhoisApi.Client(secrets.WhoisApi)
 const bot = new tgAPI(secrets.telegramBotToken, { polling: true });
 
 function sendRes(url, contentType, response) {
@@ -56,21 +57,68 @@ function getContentType(url) {
 const respondToAPI = (request, response) => {
     const args = request.split("/")
     const request_type = args[2]
-    const convertedID = Base64.encode(request.replace("/api/checkWebsite/", ""), true)
-    console.log(convertedID)
     switch (request_type) {
         case "checkWebsite": {
-            var pageData = "Oops!"
-            superagent.get('https://virustotal.com/api/v3/urls/'+convertedID)
-                .query({
-                    "X-Apikey": "4f568290f7207277244dce36f5b2e11c9cab01c57848795421ae0fa988a93967",
-                })
-                .end((err, res) => {
-                    if (err) { return console.log(err); }
-                    response.writeHead(200, { 'Content-Type': "text/html" })
-                    response.write(res.data)
+            const url = request.replace("/api/checkWebsite/", "")
+            let WhoisData = null
+            WhoisApiClient.getRaw(url, WhoisApi.JSON_FORMAT)
+                .then(function (data) {
+                    const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+                    var suspoints = 0
+                    const urlObject = new URL(url)
+                    var DataToReturn = {}
+                    const addField = (field, value) => {
+                        DataToReturn[field] = value
+                    }
+                    WhoisData = JSON.parse(data).WhoisRecord
+                    // Registrant info
+                    const registrant = WhoisData["registrant"]
+                    try {
+                        const registrantFlagURL = "https://countryflagsapi.com/png/" + registrant.countryCode
+                        addField("reg_flag", registrantFlagURL)
+                    } catch (error) { }
+                    try {
+                        const registrantCountry = registrant.country
+                        addField("Страна регистрации", registrantCountry)
+                    } catch (error) { }
+                    try {
+                        const registrantOrg = registrant.organization
+                        addField("Организация регистрации", registrantOrg)
+                    } catch (error) { }
+                    // Date created
+                    try {
+                        const createdDate = new Date(WhoisData.createdDate)
+                        addField("Дата регистрации", createdDate)
+                        suspoints += (createdDate.getFullYear() - 2015) / 10
+                    } catch (error) { }
+                    // Email
+                    try {
+                        const contactEmail = WhoisData["contactEmail"]
+                        addField("Контактный адрес электронной почты", contactEmail)
+                    } catch (error) { }
+                    // Hosts
+                    try {
+                        const hosts = WhoisData.nameServers.hostNames
+                        addField("hosts", createdDate)
+                        suspoints = suspoints / hosts.length
+                    } catch (error) { }
+                    try {
+                        let count = 0
+                        const subdomains = urlObject.host.split(".")
+                        for (let i = 2; i < 100; i++) {
+                            if (subdomains[i]) {
+                                count += 1
+                                suspoints += 1
+                            }
+                        }
+                        addField("Субдоменов", count)
+                    } catch (error) { console.log(error) }
+                    suspoints = clamp(suspoints, 0, 10)
+                    addField("Подозрительность", suspoints)
+                    response.writeHead(200, { 'Content-Type': "application/json" })
+                    response.write(JSON.stringify(DataToReturn))
                     response.end()
-                });
+                })
         }
     }
 }
@@ -103,21 +151,40 @@ bot.setMyCommands([
     }
 ])
 
-bot.onText("/start", (msg, match) => {
-    const chatID = msg.chat.id
+bot.onText(/\/start/, (msg, match) => {
+    const chatId = msg.chat.id
     const actionOptions = {
         reply_markup: JSON.stringify({
             inline_keyboard: [
                 [{
                     text: "Проверить ссылку",
-                    callback_data: "check_link"
+                    callback_data: "action_check_link"
+                }],
+                [{
+                    text: "Проверить QR код",
+                    callback_data: "action_check_qr"
                 }]
             ]
         })
     }
-    bot.sendMessage(chatID, "Привет, что бы ты хотел сделать?")
+    bot.sendMessage(chatId, 'Привет! Что бы ты хотел сделать?',actionOptions)
 })
 
-bot.on("callback_query", msg => {
-    console.log(msg.data)
+
+bot.on('callback_query', (msg) => {
+    const data = msg.data
+    const chatId = msg.message.chat.id
+    if (data.startsWith("action_")){
+        const action = data.replace("action_","")
+        switch (action) {
+            case "check_link":{
+                bot.sendMessage(chatId,"↓ Хорошо, введи ссылку которую хочешь проверить ↓")
+                break
+            };
+            case "check_qr":{
+                bot.sendMessage(chatId,"Намного удобнее сканировать QR коды на нашем <a href='/'>сайте</a>",{parse_mode: 'HTML'})
+                break
+            };
+        }
+    }
 })
