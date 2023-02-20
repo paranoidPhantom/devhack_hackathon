@@ -18,7 +18,6 @@
   "homepage": "https://github.com/paranoidGhost/devhack_hackathon#readme",
   "dependencies": {
     "api": "^5.0.7",
-    "catboost": "^1.25.1",
     "colors": "^1.4.0",
     "follow-redirects": "^1.15.2",
     "got": "^12.5.3",

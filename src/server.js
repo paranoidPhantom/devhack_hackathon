@@ -16,7 +16,7 @@ const { info } = require("console");
 const WhoisApiClient = new WhoisApi.Client(secrets.WhoisApi)
 const bot = new tgAPI(secrets.telegramBotToken, { polling: true });
 
-const selfURL = "https://link-checker.onrender.com"
+const selfURL = "https://link-checking-service.onrender.com"
 
 function sendRes(url, contentType, response) {
     const file = path.join(__dirname + "/", url)
